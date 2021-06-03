@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
@@ -15,6 +17,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.goldcrestwilma.batch.common.StringWrapper;
+import com.goldcrestwilma.listener.JobCompletionListener;
+import com.goldcrestwilma.step.Processor;
+import com.goldcrestwilma.step.Reader;
+import com.goldcrestwilma.step.Writer;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +32,7 @@ public class BatchConfiguration {
 
     private static final String JOB_NAME = "DefaultJob";
     private static final String STEP_NAME = JOB_NAME + "Step";
+    private static final String ORDER_STEP = "orderStep";
 
     private final JobBuilderFactory jobBuilderFactory;
     private final StepBuilderFactory stepBuilderFactory;
@@ -33,18 +40,36 @@ public class BatchConfiguration {
     @Bean
     public Job job() {
         return jobBuilderFactory.get(JOB_NAME)
-            .start(step())
+            .listener(listener())
+            //.start(step())
+            .incrementer(new RunIdIncrementer())
+            .flow(orderStep())
+            .end()
             .build();
     }
 
     @Bean
     public Step step() {
-        return  stepBuilderFactory.get(STEP_NAME)
+        return stepBuilderFactory.get(STEP_NAME)
             .<String, StringWrapper>chunk(1)
             .reader(itemReader())
             .processor(itemProcess())
             .writer(itemWriter())
             .build();
+    }
+
+    @Bean
+    public Step orderStep() {
+        return stepBuilderFactory.get(ORDER_STEP).<String, String>chunk(1)
+            .reader(new Reader())
+            .processor(new Processor())
+            .writer(new Writer())
+            .build();
+    }
+
+    @Bean
+    public JobExecutionListener listener() {
+        return new JobCompletionListener();
     }
 
 
